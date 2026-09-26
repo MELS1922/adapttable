@@ -117,6 +117,7 @@ import {
 import {
   Button,
   Checkbox,
+  ConfigProvider,
   Empty,
   Flex,
   Pagination,
@@ -138,6 +139,7 @@ import {
   type TdHTMLAttributes,
   type UIEventHandler,
   useCallback,
+  useContext,
   useMemo,
   useRef,
   useState,
@@ -210,6 +212,29 @@ function buildRowClassName<TRow>(
 }
 
 /**
+ * antd's `Empty` with the host's words in its illustration too: the picture
+ * carries an SVG `<title>` read from antd's locale, which would otherwise
+ * keep saying antd's own "No data" beside a localized description.
+ */
+function LocalizedEmpty({
+  description,
+  children,
+}: Readonly<{ description: string; children?: ReactNode }>) {
+  const { locale } = useContext(ConfigProvider.ConfigContext);
+  return (
+    <ConfigProvider
+      locale={{
+        ...locale,
+        locale: locale?.locale ?? "en",
+        Empty: { description },
+      }}
+    >
+      <Empty description={description}>{children}</Empty>
+    </ConfigProvider>
+  );
+}
+
+/**
  * Variant-aware empty state: `"noResults"` (zero rows under an active
  * search/filter) names the cause and offers a clear-filters CTA;
  * `"noData"` stays the plain antd `Empty`.
@@ -223,11 +248,12 @@ function EmptyState({
   labels: Required<TableLabels>;
   onClearFilters: () => void;
 }>) {
-  if (variant === "noData") return <Empty description={labels.noData} />;
+  if (variant === "noData")
+    return <LocalizedEmpty description={labels.noData} />;
   return (
-    <Empty description={labels.noResults}>
+    <LocalizedEmpty description={labels.noResults}>
       <Button onClick={onClearFilters}>{labels.clearAll}</Button>
-    </Empty>
+    </LocalizedEmpty>
   );
 }
 
