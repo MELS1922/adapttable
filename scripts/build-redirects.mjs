@@ -16,7 +16,8 @@
  *   serves gets a page at its previous address carrying an instant
  *   meta-refresh and a canonical link to its new URL — the form search engines
  *   read as a permanent redirect — plus a script that keeps the query string and
- *   fragment for readers. A stub on the new site is followed to its final page,
+ *   fragment for readers and tags the visit with where it came from, since the
+ *   redirect itself replaces the referrer the new site would see. A stub on the new site is followed to its final page,
  *   so no reader takes two hops. Media, social cards, `llms*.txt`, the
  *   favicon and the search-console verification file are copied as they are:
  *   published READMEs embed the media by its previous URL, and an image cannot
@@ -153,6 +154,33 @@ export const redirectsTable = (root) => {
 };
 
 /**
+ * The query string a redirect page forwards: the page's own, plus
+ * `utm_source` / `utm_medium` naming the referring site when the link carries
+ * no `utm_source` of its own. A search engine reads as `organic`, any other
+ * outside site as `referral`. Its source is written into each page, so it
+ * uses nothing the page does not have.
+ *
+ * @param {string} search - The page's `location.search`.
+ * @param {string} referrer - The page's `document.referrer`.
+ * @param {string} host - The page's `location.hostname`.
+ * @returns {string}
+ */
+export function forwardedQuery(search, referrer, host) {
+  const from = referrer ? new URL(referrer).hostname : "";
+  if (!from || from === host || /[?&]utm_source=/.test(search)) return search;
+  const engine =
+    /(?:^|\.)(google|bing|duckduckgo|yahoo|yandex|baidu|ecosia|naver)\./.exec(
+      from
+    );
+  const source = encodeURIComponent(engine ? engine[1] : from);
+  const medium = engine ? "organic" : "referral";
+  return `${search}${search ? "&" : "?"}utm_source=${source}&utm_medium=${medium}`;
+}
+
+/** The script expression each redirect page forwards its query with. */
+const FORWARDED_QUERY = `(${forwardedQuery})(location.search, document.referrer, location.hostname)`;
+
+/**
  * One redirect page for the previous address.
  *
  * @param {string} target - The absolute URL the page has moved to.
@@ -167,7 +195,7 @@ export const redirectPage = (target) => {
     <title>AdaptTable — this page has moved</title>
     <link rel="canonical" href="${url}" />
     <meta http-equiv="refresh" content="0; url=${url}" />
-    <script>location.replace(${JSON.stringify(target)} + location.search + location.hash);</script>
+    <script>location.replace(${JSON.stringify(target)} + ${FORWARDED_QUERY} + location.hash);</script>
   </head>
   <body>
     <p>This page has moved to <a href="${url}">${url}</a>.</p>
@@ -190,7 +218,7 @@ export const notFoundPage = () => {
   <head>
     <meta charset="utf-8" />
     <title>AdaptTable — this page has moved</title>
-    <script>location.replace(${JSON.stringify(siteUrl(""))} + location.pathname.replace(${JSON.stringify(base)}, "") + location.search + location.hash);</script>
+    <script>location.replace(${JSON.stringify(siteUrl(""))} + location.pathname.replace(${JSON.stringify(base)}, "") + ${FORWARDED_QUERY} + location.hash);</script>
   </head>
   <body>
     <p>AdaptTable now lives at <a href="${siteUrl("/")}">${siteUrl("/")}</a>.</p>
