@@ -212,9 +212,11 @@ function buildRowClassName<TRow>(
 }
 
 /**
- * antd's `Empty` with the host's words in its illustration too: the picture
+ * antd's `Empty` with the host's words in its illustration too. The picture
  * carries an SVG `<title>` read from antd's locale, which would otherwise
- * keep saying antd's own "No data" beside a localized description.
+ * keep saying antd's own "No data" beside a localized description — as a
+ * hover tooltip, and to assistive tech. The title takes the description, and
+ * the picture is hidden from assistive tech so the message is heard once.
  */
 function LocalizedEmpty({
   description,
@@ -229,7 +231,16 @@ function LocalizedEmpty({
         Empty: { description },
       }}
     >
-      <Empty description={description}>{children}</Empty>
+      <Empty
+        description={description}
+        image={
+          <div aria-hidden="true" style={{ height: "100%" }}>
+            {Empty.PRESENTED_IMAGE_DEFAULT}
+          </div>
+        }
+      >
+        {children}
+      </Empty>
     </ConfigProvider>
   );
 }

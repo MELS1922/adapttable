@@ -1335,9 +1335,14 @@ describe("<DataTable> (Ant Design)", () => {
     );
     // Zero rows under an active filter → "no results", not "no data".
     const empty = screen.getByRole("status");
+    expect(empty.querySelector(".ant-empty-description")).toHaveTextContent(
+      "No results match your filters"
+    );
+    // The picture repeats the description in its <title>, so it is hidden
+    // from assistive tech and the reader hears the message once.
     expect(
-      within(empty).getByText("No results match your filters")
-    ).toBeInTheDocument();
+      empty.querySelector('.ant-empty-image > [aria-hidden="true"] svg title')
+    ).toHaveTextContent("No results match your filters");
     // Without a caller onClearFilters the CTA falls back to clearExtras:
     // the filter (and its chip) disappears and the variant flips to noData.
     fireEvent.click(within(empty).getByRole("button", { name: "Clear all" }));
