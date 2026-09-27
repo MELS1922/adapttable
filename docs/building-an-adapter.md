@@ -607,10 +607,13 @@ peers, and the AdaptTable packages as dependencies pinned to exact versions:
 
 `@adapttable/core/conformance` is the suite every built-in adapter passes:
 the structural parts, the table's accessible name, row and cell identity,
-sorting and its `aria-sort`, right-to-left, mobile cards, the empty state and
-row selection. It asserts against the DOM and depends on no test runner and no
-framework. A driver renders the kit's table for each scenario; the runner
-registers the tests the suite returns:
+sorting and its `aria-sort`, right-to-left, mobile cards, the empty state, row
+selection, the status region's announcements after a sort or a page, the
+dataset size on a partial page, the host's labels in controls and
+announcements, and keyboard cell navigation — the grid role, the roving tab
+stop, arrow keys and the focus announcer. It asserts against the DOM and
+depends on no test runner and no framework. A driver renders the kit's table
+for each scenario; the runner registers the tests the suite returns:
 
 ```tsx
 // src/conformance.test.tsx
@@ -624,6 +627,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { bulkActions } from "./bulk-actions";
+import { cellNavigation } from "./cell-navigation";
 import { type ColumnDef, DataTable } from "./index";
 
 function columnsFor(
@@ -649,8 +653,14 @@ const driver: ConformanceDriver = {
         tableLabel={scenario.tableLabel}
         dir={scenario.dir}
         forceMobile={scenario.mobile}
-        features={
-          scenario.selectable
+        defaults={
+          scenario.pageSize === undefined
+            ? undefined
+            : { limit: scenario.pageSize }
+        }
+        labels={scenario.labels}
+        features={[
+          ...(scenario.selectable
             ? [
                 bulkActions([
                   {
@@ -660,8 +670,9 @@ const driver: ConformanceDriver = {
                   },
                 ]),
               ]
-            : []
-        }
+            : []),
+          ...(scenario.navigable ? [cellNavigation()] : []),
+        ]}
       />
     ),
 };
@@ -679,6 +690,14 @@ describe(`table conformance — ${driver.name}`, () => {
 
 jsdom has no `matchMedia`; stub it with a non-matching implementation in the
 test setup so the table renders its desktop layout.
+
+A binding for another framework plugs in the same way. Its driver mounts the
+binding's table component with that framework's test utilities — Vue Test
+Utils' `mount` with `attachTo`, or Angular's `TestBed` — maps the scenario onto
+the component's inputs, and returns the element it rendered into and a
+function that unmounts it. The harness is the same: the runner's `expect` and
+DOM Testing Library's `fireEvent` and `waitFor`, which dispatch real DOM events
+whatever rendered the table. Nothing in the suite changes.
 
 Beyond the suite, the built-in adapters are held to parity by:
 

@@ -2272,7 +2272,9 @@ adapter passes, with no test runner and no framework in it.
 (`ConformanceTest`) for a runner to register. A `ConformanceDriver` mounts
 the table for a `ConformanceScenario` and returns a `ConformanceMount`; a
 `ConformanceHarness` carries the runner's `expect` (`ConformanceExpectation`)
-and DOM Testing Library's `fireEvent` and `waitFor`. `CONFORMANCE_ROWS`
+and DOM Testing Library's `fireEvent` (`click` and `keyDown`) and `waitFor`.
+A scenario's `labels` (`ConformanceLabels`) are the host's words the table must
+use. `CONFORMANCE_ROWS`
 (`ConformanceRow`) and `CONFORMANCE_COLUMNS` (`ConformanceColumn`) are the
 scenario data. [Testing an adapter](./building-an-adapter.md#testing) shows a
 React driver.

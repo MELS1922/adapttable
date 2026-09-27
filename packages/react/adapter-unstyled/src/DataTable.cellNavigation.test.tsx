@@ -1,10 +1,10 @@
 /**
- * Cell navigation parity for the unstyled adapter.
+ * Cell navigation beyond the shared contract, for the unstyled adapter.
  *
- * Core owns the behaviour; what each adapter has to get right is the wiring —
- * that the grid role reaches the table element, that cells carry the roving
- * tab stop and their ABSOLUTE column index, that a row carries its absolute
- * row index, and that omitting the prop leaves all of it absent.
+ * The grid role and dimensions, the roving tab stop, absolute indices, arrow
+ * keys and the announcer are asserted by the conformance suite
+ * (`conformance.test.tsx`). What stays here is the windowed dataset size
+ * without navigation, and Enter reaching the editor.
  */
 import { createMemoryAdapter } from "@adapttable/react";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -77,59 +77,6 @@ describe("unstyled windowed dataset size", () => {
     expect(document.querySelector("table")).not.toHaveAttribute(
       "aria-rowcount"
     );
-  });
-});
-
-describe("unstyled cell navigation", () => {
-  it("marks the table as a grid and carries the dataset dimensions", () => {
-    render(table({ cellNavigation: true }));
-    const grid = screen.getByRole("grid");
-    expect(grid).toHaveAttribute("aria-rowcount", "2");
-    expect(grid).toHaveAttribute("aria-colcount", "2");
-  });
-
-  it("gives cells the roving tab stop and absolute indices", () => {
-    render(table({ cellNavigation: true }));
-    expect(cellAt(0, 0)).toHaveAttribute("tabindex", "0");
-    expect(cellAt(0, 1)).toHaveAttribute("tabindex", "-1");
-    expect(cellAt(0, 0)).toHaveAttribute("aria-colindex", "1");
-    expect(cellAt(0, 1)).toHaveAttribute("aria-colindex", "2");
-  });
-
-  it("numbers rows absolutely", () => {
-    render(table({ cellNavigation: true }));
-    const rows = screen.getAllByRole("row");
-    // The header row is row 1, so the first body row is 1-based index 1 here
-    // (this adapter's own header handling decides which element that is).
-    expect(rows.some((r) => r.getAttribute("aria-rowindex") === "1")).toBe(
-      true
-    );
-  });
-
-  it("moves focus with the arrow keys", () => {
-    render(table({ cellNavigation: true }));
-    fireEvent.keyDown(screen.getByRole("grid"), { key: "ArrowRight" });
-    expect(cellAt(0, 1)).toHaveFocus();
-  });
-
-  it("renders the announcer only when navigation is on", () => {
-    const on = render(table({ cellNavigation: true }));
-    expect(
-      on.container.querySelector('[data-adapttable-part="grid-announcer"]')
-    ).not.toBeNull();
-    on.unmount();
-
-    const off = render(table());
-    expect(
-      off.container.querySelector('[data-adapttable-part="grid-announcer"]')
-    ).toBeNull();
-  });
-
-  it("costs nothing when omitted", () => {
-    render(table());
-    // No grid role, no focusable cells, no key handling.
-    expect(screen.queryByRole("grid")).toBeNull();
-    expect(cellAt(0, 0)).toBeNull();
   });
 });
 

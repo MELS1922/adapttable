@@ -12,6 +12,11 @@ import {
 const click = (element: Element): boolean =>
   element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
+const keyDown = (element: Element, init?: { key?: string }): boolean =>
+  element.dispatchEvent(
+    new KeyboardEvent("keydown", { bubbles: true, key: init?.key })
+  );
+
 async function waitFor<T>(callback: () => T): Promise<T> {
   let last: unknown;
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -32,7 +37,7 @@ function collect(
 ): readonly ConformanceTest[] {
   return tableConformanceTests(driver, {
     expect: assert,
-    fireEvent: { click },
+    fireEvent: { click, keyDown },
     waitFor,
   });
 }
@@ -46,29 +51,75 @@ const referenceDriver: ConformanceDriver = {
   mount(scenario) {
     const container = document.createElement("div");
     document.body.append(container);
-    let sort: "asc" | "desc" | undefined;
-    const selected = new Set<string>();
+    const labels = { ...defaultLabels, ...scenario.labels };
+    const state: DrawState = {
+      sort: undefined,
+      selected: new Set<string>(),
+      page: 0,
+      focus: [0, 0],
+      status: "",
+    };
     const draw = (): void => {
-      container.replaceChildren(build(scenario, sort, selected));
+      container.replaceChildren(build(scenario, state));
       for (const button of container.querySelectorAll("th button")) {
         button.addEventListener("click", () => {
-          sort = sort === "asc" ? "desc" : "asc";
+          const sort = state.sort === "asc" ? "desc" : "asc";
+          state.sort = sort;
+          state.status = labels.sortedBy({
+            column: button.textContent ?? "",
+            ascending: sort === "asc",
+          });
           draw();
         });
       }
       for (const box of container.querySelectorAll("input[type=checkbox]")) {
         box.addEventListener("click", () => {
           const id = box.closest("tr")?.getAttribute("data-row-id") ?? "";
-          if (selected.has(id)) selected.delete(id);
-          else selected.add(id);
+          if (state.selected.has(id)) state.selected.delete(id);
+          else state.selected.add(id);
           draw();
         });
       }
+      container
+        .querySelector("[data-next-page]")
+        ?.addEventListener("click", () => {
+          const size = scenario.pageSize ?? scenario.rows.length;
+          const pages = Math.ceil(scenario.rows.length / size);
+          state.page = Math.min(state.page + 1, pages - 1);
+          const from = state.page * size + 1;
+          const to = Math.min(from + size - 1, scenario.rows.length);
+          const total = scenario.rows.length;
+          state.status = `${labels.pageOf({ page: state.page + 1, total: pages })}. ${labels.showing({ from, to, total })}`;
+          draw();
+        });
+      container
+        .querySelector('[role="grid"]')
+        ?.addEventListener("keydown", (event) => {
+          const [row, column] = state.focus;
+          const key = (event as KeyboardEvent).key;
+          if (key === "ArrowRight") state.focus = [row, column + 1];
+          if (key === "ArrowDown") state.focus = [row + 1, column];
+          draw();
+          container
+            .querySelector<HTMLElement>(
+              `[data-grid-cell="${state.focus[0]}:${state.focus[1]}"]`
+            )
+            ?.focus();
+        });
     };
     draw();
     return { container, unmount: () => container.remove() };
   },
 };
+
+/** What the reference table remembers between draws. */
+interface DrawState {
+  sort: "asc" | "desc" | undefined;
+  selected: Set<string>;
+  page: number;
+  focus: [number, number];
+  status: string;
+}
 
 function element(
   tag: string,
@@ -89,22 +140,37 @@ const ARIA_SORT = {
   none: "none",
 } as const;
 
-function build(
-  scenario: ConformanceScenario,
-  sort: "asc" | "desc" | undefined,
-  selected: ReadonlySet<string>
-): HTMLElement {
-  const rows = [...scenario.rows];
+function build(scenario: ConformanceScenario, state: DrawState): HTMLElement {
+  const { sort, selected } = state;
+  const labels = { ...defaultLabels, ...scenario.labels };
+  const navigable = scenario.navigable === true;
+  const size = scenario.pageSize ?? scenario.rows.length;
+  const sorted = [...scenario.rows];
   if (sort) {
-    rows.sort((a, b) => (sort === "asc" ? a.age - b.age : b.age - a.age));
+    sorted.sort((a, b) => (sort === "asc" ? a.age - b.age : b.age - a.age));
   }
+  const rows = sorted.slice(state.page * size, state.page * size + size);
   const root = element("div", {
     "data-adapttable-part": "root",
     dir: scenario.dir,
   });
-  root.append(element("div", { "data-adapttable-part": "toolbar" }));
+  root.append(
+    element("div", { "data-adapttable-part": "toolbar" }),
+    element(
+      "div",
+      {
+        "data-adapttable-part": "table-status-announcer",
+        "aria-live": "polite",
+        "aria-atomic": "true",
+      },
+      [state.status]
+    )
+  );
+  if (navigable) {
+    root.append(element("div", { "data-adapttable-part": "grid-announcer" }));
+  }
   if (rows.length === 0) {
-    root.append(element("div", { role: "status" }, [defaultLabels.noData]));
+    root.append(element("div", { role: "status" }, [labels.noData]));
     return root;
   }
   if (scenario.mobile) {
@@ -140,6 +206,7 @@ function build(
         role: "row",
         "data-row-id": row.id,
         "data-index": String(index),
+        "aria-rowindex": navigable ? String(index + 1) : undefined,
         "aria-selected": scenario.selectable
           ? String(selected.has(row.id))
           : undefined,
@@ -148,10 +215,23 @@ function build(
         ...(scenario.selectable
           ? [element("td", {}, [element("input", { type: "checkbox" })])]
           : []),
-        ...scenario.columns.map((column) =>
+        ...scenario.columns.map((column, columnIndex) =>
           element(
             "td",
-            { "data-adapttable-part": "cell", "data-column-key": column.key },
+            {
+              "data-adapttable-part": "cell",
+              "data-column-key": column.key,
+              ...(navigable
+                ? {
+                    "data-grid-cell": `${index}:${columnIndex}`,
+                    "aria-colindex": String(columnIndex + 1),
+                    tabindex:
+                      state.focus[0] === index && state.focus[1] === columnIndex
+                        ? "0"
+                        : "-1",
+                  }
+                : {}),
+            },
             [String(row[column.key])]
           )
         ),
@@ -161,7 +241,15 @@ function build(
   root.append(
     element(
       "table",
-      { "data-adapttable-part": "table", "aria-label": scenario.tableLabel },
+      {
+        "data-adapttable-part": "table",
+        "aria-label": scenario.tableLabel,
+        role: navigable ? "grid" : undefined,
+        "aria-rowcount": String(scenario.rows.length),
+        "aria-colcount": navigable
+          ? String(scenario.columns.length)
+          : undefined,
+      },
       [
         element("thead", { "data-adapttable-part": "thead" }, [
           element("tr", {}, header),
@@ -170,6 +258,11 @@ function build(
       ]
     )
   );
+  if (scenario.pageSize !== undefined) {
+    root.append(
+      element("button", { "data-next-page": "", "aria-label": labels.nextPage })
+    );
+  }
   return root;
 }
 
@@ -194,7 +287,7 @@ describe("the table conformance suite", () => {
   const failures: string[] = [];
 
   it("returns every assertion, in order", () => {
-    expect(tests.map((test) => test.name)).toHaveLength(11);
+    expect(tests.map((test) => test.name)).toHaveLength(21);
   });
 
   for (const test of tests) {
