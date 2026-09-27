@@ -1,10 +1,10 @@
 /**
- * Cell navigation parity for the antd adapter.
+ * Cell navigation where antd's own table structure is the risk.
  *
- * Core owns the behaviour; what each adapter has to get right is the wiring —
- * that the grid role reaches the table element, that cells carry the roving
- * tab stop and their ABSOLUTE column index, that a row carries its absolute
- * row index, and that omitting the prop leaves all of it absent.
+ * The shared contract — the grid role and dimensions, the roving tab stop,
+ * absolute indices, arrow keys and the announcer — is asserted by the
+ * conformance suite (`conformance.test.tsx`). What stays here is antd's own:
+ * the sticky header's split tables, paste, and Enter reaching the editor.
  */
 import {
   act,
@@ -35,74 +35,10 @@ const columns: ColumnDef<Row>[] = [
   { key: "team", header: "Team", accessor: (r) => r.team },
 ];
 
-const table = (extra?: { cellNavigation?: boolean }) => (
-  <>
-    <DataTable
-      data={ROWS}
-      columns={columns}
-      rowKey={(r) => r.id}
-      urlSync={false}
-      forceMobile={false}
-      {...extra}
-    />
-  </>
-);
-
 const cellAt = (row: number, col: number) =>
   document.querySelector<HTMLElement>(`[data-grid-cell="${row}:${col}"]`);
 
 describe("antd cell navigation", () => {
-  it("marks the table as a grid and carries the dataset dimensions", () => {
-    render(table({ cellNavigation: true }));
-    const grid = screen.getByRole("grid");
-    expect(grid).toHaveAttribute("aria-rowcount", "2");
-    expect(grid).toHaveAttribute("aria-colcount", "2");
-  });
-
-  it("gives cells the roving tab stop and absolute indices", () => {
-    render(table({ cellNavigation: true }));
-    expect(cellAt(0, 0)).toHaveAttribute("tabindex", "0");
-    expect(cellAt(0, 1)).toHaveAttribute("tabindex", "-1");
-    expect(cellAt(0, 0)).toHaveAttribute("aria-colindex", "1");
-    expect(cellAt(0, 1)).toHaveAttribute("aria-colindex", "2");
-  });
-
-  it("numbers rows absolutely", () => {
-    render(table({ cellNavigation: true }));
-    const rows = screen.getAllByRole("row");
-    // The header row is row 1, so the first body row is 1-based index 1 here
-    // (this adapter's own header handling decides which element that is).
-    expect(rows.some((r) => r.getAttribute("aria-rowindex") === "1")).toBe(
-      true
-    );
-  });
-
-  it("moves focus with the arrow keys", () => {
-    render(table({ cellNavigation: true }));
-    fireEvent.keyDown(screen.getByRole("grid"), { key: "ArrowRight" });
-    expect(cellAt(0, 1)).toHaveFocus();
-  });
-
-  it("renders the announcer only when navigation is on", () => {
-    const on = render(table({ cellNavigation: true }));
-    expect(
-      on.container.querySelector('[data-adapttable-part="grid-announcer"]')
-    ).not.toBeNull();
-    on.unmount();
-
-    const off = render(table());
-    expect(
-      off.container.querySelector('[data-adapttable-part="grid-announcer"]')
-    ).toBeNull();
-  });
-
-  it("costs nothing when omitted", () => {
-    render(table());
-    // No grid role, no focusable cells, no key handling.
-    expect(screen.queryByRole("grid")).toBeNull();
-    expect(cellAt(0, 0)).toBeNull();
-  });
-
   it("keeps sticky-header columnheaders inside the same grid", () => {
     const { container } = render(
       <DataTable
