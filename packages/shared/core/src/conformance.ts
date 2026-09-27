@@ -14,6 +14,7 @@ export {
   type ConformanceDriver,
   type ConformanceExpectation,
   type ConformanceHarness,
+  type ConformanceLabels,
   type ConformanceMount,
   type ConformanceRow,
   type ConformanceScenario,

@@ -4861,6 +4861,7 @@
       "ConformanceDriver",
       "ConformanceExpectation",
       "ConformanceHarness",
+      "ConformanceLabels",
       "ConformanceMount",
       "ConformanceRow",
       "ConformanceScenario",

@@ -38,8 +38,21 @@ export interface ConformanceHarness {
     readonly expect: (actual: unknown) => ConformanceExpectation;
     readonly fireEvent: {
         readonly click: (element: Element) => unknown;
+        readonly keyDown: (element: Element, init?: {
+            readonly key?: string;
+        }) => unknown;
     };
     readonly waitFor: <T>(callback: () => T) => Promise<T>;
+}
+
+// @public
+export interface ConformanceLabels {
+    readonly nextPage?: string;
+    readonly noData?: string;
+    readonly sortedBy?: (info: {
+        readonly column: string;
+        readonly ascending: boolean;
+    }) => string;
 }
 
 // @public
@@ -59,7 +72,10 @@ export interface ConformanceRow {
 export interface ConformanceScenario {
     readonly columns: readonly ConformanceColumn[];
     readonly dir?: "ltr" | "rtl";
+    readonly labels?: ConformanceLabels;
     readonly mobile?: boolean;
+    readonly navigable?: boolean;
+    readonly pageSize?: number;
     readonly rows: readonly ConformanceRow[];
     readonly selectable?: boolean;
     readonly tableLabel: string;

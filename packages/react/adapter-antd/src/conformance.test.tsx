@@ -7,6 +7,7 @@ import {
 import { fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { cellNavigation } from "./cell-navigation";
 import { DataTable } from "./data-table.test-utils";
 import type { ColumnDef } from "./index";
 import { renderAntd } from "./test-utils";
@@ -34,6 +35,13 @@ const driver: ConformanceDriver = {
         tableLabel={scenario.tableLabel}
         dir={scenario.dir}
         forceMobile={scenario.mobile}
+        defaults={
+          scenario.pageSize === undefined
+            ? undefined
+            : { limit: scenario.pageSize }
+        }
+        labels={scenario.labels}
+        features={scenario.navigable ? [cellNavigation()] : undefined}
         bulkActions={
           scenario.selectable
             ? [{ key: "archive", label: "Archive", onClick: () => undefined }]

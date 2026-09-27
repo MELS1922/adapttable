@@ -41,8 +41,10 @@
  * `@testing-library/vue`'s or `@testing-library/angular`'s `render` with the
  * binding's table component, translating the scenario into that component's
  * props — `rows` into the binding's frontend data source, `columns` into its
- * column definitions, `selectable` into its selection feature — and returns
- * the container and the unmount. Nothing in the suite changes.
+ * column definitions, `selectable` into its selection feature, `navigable`
+ * into its cell navigation, `pageSize` into its default page size, `labels`
+ * into its labels — and returns the container and the unmount. Nothing in the
+ * suite changes.
  */
 import { defaultLabels } from "../labels";
 
@@ -75,6 +77,24 @@ export interface ConformanceColumn {
 }
 
 /**
+ * The labels a scenario overrides — the host's own words, which the table
+ * must use in its controls and in what it announces.
+ *
+ * @public
+ */
+export interface ConformanceLabels {
+  /** The empty-state message. */
+  readonly noData?: string;
+  /** The name of the pager's next-page control. */
+  readonly nextPage?: string;
+  /** The sentence announced after a sort. */
+  readonly sortedBy?: (info: {
+    readonly column: string;
+    readonly ascending: boolean;
+  }) => string;
+}
+
+/**
  * What a driver renders: frontend data, plain columns, and the switches the
  * suite exercises.
  *
@@ -93,6 +113,12 @@ export interface ConformanceScenario {
   readonly mobile?: boolean;
   /** Compose row selection. */
   readonly selectable?: boolean;
+  /** Rows per page. Omit for the binding's default page size. */
+  readonly pageSize?: number;
+  /** Compose keyboard cell navigation. */
+  readonly navigable?: boolean;
+  /** Labels that replace the defaults. */
+  readonly labels?: ConformanceLabels;
 }
 
 /**
@@ -147,7 +173,13 @@ export interface ConformanceHarness {
   /** Start an assertion. */
   readonly expect: (actual: unknown) => ConformanceExpectation;
   /** Dispatch DOM events. */
-  readonly fireEvent: { readonly click: (element: Element) => unknown };
+  readonly fireEvent: {
+    readonly click: (element: Element) => unknown;
+    readonly keyDown: (
+      element: Element,
+      init?: { readonly key?: string }
+    ) => unknown;
+  };
   /** Retry a callback until it stops throwing. */
   readonly waitFor: <T>(callback: () => T) => Promise<T>;
 }
@@ -200,6 +232,38 @@ function parts(root: ParentNode, name: string): HTMLElement[] {
   return [
     ...root.querySelectorAll<HTMLElement>(`[data-adapttable-part="${name}"]`),
   ];
+}
+
+/** The live region that says what changed after a sort or a page. */
+function statusRegion(root: HTMLElement): HTMLElement | null {
+  return root.ownerDocument.querySelector<HTMLElement>(
+    '[data-adapttable-part="table-status-announcer"]'
+  );
+}
+
+/** Text with its whitespace collapsed, as a reader hears it. */
+function spoken(element: Element | null): string {
+  return element?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+/**
+ * The control a reader knows by `name`: a button or link whose accessible
+ * name — its `aria-label`, `title` or text — is that name.
+ */
+function controlNamed(root: ParentNode, name: string): Element | null {
+  const controls = root.querySelectorAll('button, [role="button"], a[href]');
+  return (
+    [...controls].find(
+      (control) =>
+        control.getAttribute("aria-label") === name ||
+        control.getAttribute("title") === name ||
+        spoken(control) === name
+    ) ?? null
+  );
+}
+
+function gridCell(root: ParentNode, row: number, column: number) {
+  return root.querySelector<HTMLElement>(`[data-grid-cell="${row}:${column}"]`);
 }
 
 function rowIds(root: ParentNode): (string | null)[] {
@@ -369,5 +433,161 @@ export function tableConformanceTests(
         );
       });
     }));
+
+  it("keeps an empty, polite status region from the first paint", () =>
+    withTable(BASE, (container) => {
+      // A region that appears together with its text is often missed, so it
+      // must be in the document, and silent, before there is anything to say.
+      const region = statusRegion(container);
+      expect(region).not.toBeNull();
+      expect(spoken(region)).toBe("");
+      expect(region?.getAttribute("aria-live")).toBe("polite");
+      expect(region?.getAttribute("aria-atomic")).toBe("true");
+    }));
+
+  it("announces the column and direction of each sort", () =>
+    withTable(BASE, async (container) => {
+      const button = sortControlOf(headerFor(container, "age"));
+      expect(button).not.toBeNull();
+      if (!button) return;
+      fireEvent.click(button);
+      await waitFor(() => {
+        expect(spoken(statusRegion(container))).toBe(
+          defaultLabels.sortedBy({ column: "Age", ascending: true })
+        );
+      });
+      fireEvent.click(button);
+      await waitFor(() => {
+        expect(spoken(statusRegion(container))).toBe(
+          defaultLabels.sortedBy({ column: "Age", ascending: false })
+        );
+      });
+    }));
+
+  it("announces the page and the rows on it when the reader pages", () =>
+    withTable({ ...BASE, pageSize: 2 }, async (container) => {
+      const next = controlNamed(container, defaultLabels.nextPage);
+      expect(next).not.toBeNull();
+      if (!next) return;
+      fireEvent.click(next);
+      await waitFor(() => {
+        const said = spoken(statusRegion(container));
+        expect(said.includes(defaultLabels.pageOf({ page: 2, total: 2 }))).toBe(
+          true
+        );
+        // The count is the footer's own wording, not a bare number.
+        expect(
+          said.includes(defaultLabels.showing({ from: 3, to: 3, total: 3 }))
+        ).toBe(true);
+      });
+      expect(rowIds(container)).toEqual(["r3"]);
+    }));
+
+  it("states the dataset size on a page that shows part of it", () =>
+    withTable({ ...BASE, pageSize: 2 }, (container) => {
+      expect(parts(container, "row").length).toBe(2);
+      expect(part(container, "table")?.getAttribute("aria-rowcount")).toBe("3");
+      // Nothing claims the grid keyboard contract without cell navigation.
+      expect(container.querySelector('[role="grid"]')).toBeNull();
+    }));
+
+  it("speaks the host's labels, right to left", () =>
+    withTable(
+      {
+        ...BASE,
+        dir: "rtl",
+        labels: {
+          sortedBy: ({ column, ascending }) =>
+            `مُرتَّب حسب ${column}، ${ascending ? "تصاعدي" : "تنازلي"}`,
+        },
+      },
+      async (container) => {
+        const button = sortControlOf(headerFor(container, "age"));
+        expect(button).not.toBeNull();
+        if (!button) return;
+        fireEvent.click(button);
+        await waitFor(() => {
+          expect(spoken(statusRegion(container))).toBe(
+            "مُرتَّب حسب Age، تصاعدي"
+          );
+        });
+      }
+    ));
+
+  it("names its controls and states in the host's labels", () =>
+    withTable(
+      {
+        ...BASE,
+        pageSize: 2,
+        labels: { nextPage: "الصفحة التالية", noData: "لا توجد بيانات" },
+      },
+      (container) => {
+        expect(controlNamed(container, "الصفحة التالية")).not.toBeNull();
+        expect(controlNamed(container, defaultLabels.nextPage)).toBeNull();
+      }
+    ).then(() =>
+      withTable(
+        { ...BASE, rows: [], labels: { noData: "لا توجد بيانات" } },
+        (container) => {
+          expect(container.textContent?.includes("لا توجد بيانات")).toBe(true);
+          expect(container.textContent?.includes(defaultLabels.noData)).toBe(
+            false
+          );
+        }
+      )
+    ));
+
+  it("makes the table a grid with its dimensions under cell navigation", () =>
+    withTable({ ...BASE, navigable: true }, (container) => {
+      const grid = container.querySelector('[role="grid"]');
+      expect(grid).not.toBeNull();
+      expect(grid?.getAttribute("aria-rowcount")).toBe("3");
+      expect(grid?.getAttribute("aria-colcount")).toBe("2");
+    }));
+
+  it("gives one cell the tab stop and every cell its column index", () =>
+    withTable({ ...BASE, navigable: true }, (container) => {
+      expect(gridCell(container, 0, 0)?.getAttribute("tabindex")).toBe("0");
+      expect(gridCell(container, 0, 1)?.getAttribute("tabindex")).toBe("-1");
+      expect(gridCell(container, 0, 0)?.getAttribute("aria-colindex")).toBe(
+        "1"
+      );
+      expect(gridCell(container, 0, 1)?.getAttribute("aria-colindex")).toBe(
+        "2"
+      );
+      const rowIndexes = [
+        ...container.querySelectorAll('[role="row"][aria-rowindex]'),
+      ].map((row) => row.getAttribute("aria-rowindex"));
+      expect(rowIndexes.includes("1")).toBe(true);
+    }));
+
+  it("moves focus between cells with the arrow keys", () =>
+    withTable({ ...BASE, navigable: true }, async (container) => {
+      const grid = container.querySelector('[role="grid"]');
+      expect(grid).not.toBeNull();
+      if (!grid) return;
+      fireEvent.keyDown(grid, { key: "ArrowRight" });
+      await waitFor(() => {
+        expect(container.ownerDocument.activeElement).toBe(
+          gridCell(container, 0, 1)
+        );
+      });
+      fireEvent.keyDown(grid, { key: "ArrowDown" });
+      await waitFor(() => {
+        expect(container.ownerDocument.activeElement).toBe(
+          gridCell(container, 1, 1)
+        );
+      });
+    }));
+
+  it("renders the focus announcer only under cell navigation", () =>
+    withTable({ ...BASE, navigable: true }, (container) => {
+      expect(part(container, "grid-announcer")).not.toBeNull();
+    }).then(() =>
+      withTable(BASE, (container) => {
+        expect(part(container, "grid-announcer")).toBeNull();
+        expect(gridCell(container, 0, 0)).toBeNull();
+      })
+    ));
   return tests;
 }

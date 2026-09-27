@@ -14371,6 +14371,14 @@
       "behavior": ""
     },
     {
+      "export": "ConformanceLabels",
+      "currentImport": "@adapttable/core/conformance",
+      "kind": "type",
+      "class": "neutral-model",
+      "proposedImport": "@adapttable/core/conformance",
+      "behavior": ""
+    },
+    {
       "export": "ConformanceMount",
       "currentImport": "@adapttable/core/conformance",
       "kind": "type",
