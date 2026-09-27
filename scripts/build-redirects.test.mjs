@@ -14,6 +14,7 @@ import { after, describe, it } from "node:test";
 import {
   addressMap,
   finalRoute,
+  forwardedQuery,
   redirectPage,
   redirectsTable,
   writeLegacySite,
@@ -142,9 +143,51 @@ describe("redirectPage", () => {
     );
     assert.match(
       html,
-      /location\.replace\("https:\/\/example\.com\/a\?b=1&c=2" \+ location\.search \+ location\.hash\)/
+      /location\.replace\("https:\/\/example\.com\/a\?b=1&c=2" \+ /
     );
     assert.equal(html.includes("noindex"), false);
+  });
+
+  it("forwards the query through the tagging function", () => {
+    assert.match(
+      redirectPage("https://example.com/a/"),
+      /\(function forwardedQuery\(search, referrer, host\) \{[\s\S]*\}\)\(location\.search, document\.referrer, location\.hostname\) \+ location\.hash\)/
+    );
+  });
+});
+
+describe("forwardedQuery", () => {
+  const HOST = new URL(LEGACY_SITE).hostname;
+
+  it("names a search engine that sent the reader as organic", () => {
+    assert.equal(
+      forwardedQuery("", "https://www.google.com/", HOST),
+      "?utm_source=google&utm_medium=organic"
+    );
+    assert.equal(
+      forwardedQuery("?x=1", "https://www.bing.com/", HOST),
+      "?x=1&utm_source=bing&utm_medium=organic"
+    );
+  });
+
+  it("names any other outside site as a referral", () => {
+    assert.equal(
+      forwardedQuery("", "https://www.reddit.com/r/reactjs/", HOST),
+      "?utm_source=www.reddit.com&utm_medium=referral"
+    );
+  });
+
+  it("keeps the query as it is when the link is tagged, internal or unreferred", () => {
+    assert.equal(
+      forwardedQuery(
+        "?utm_source=chatgpt.com",
+        "https://www.google.com/",
+        HOST
+      ),
+      "?utm_source=chatgpt.com"
+    );
+    assert.equal(forwardedQuery("?x=1", LEGACY_SITE, HOST), "?x=1");
+    assert.equal(forwardedQuery("", "", HOST), "");
   });
 });
 
