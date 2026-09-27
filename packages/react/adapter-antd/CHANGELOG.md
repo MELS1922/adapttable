@@ -1,5 +1,15 @@
 # @adapttable/antd
 
+## 3.2.5
+
+### Patch Changes
+
+- 0d53509: The empty state's illustration uses the table's labels: its SVG title no longer says antd's own "No data" beside a localized empty message.
+- Updated dependencies [7ee30f8]
+- Updated dependencies [343239c]
+  - @adapttable/core@3.4.0
+  - @adapttable/react@1.3.4
+
 ## 3.2.4
 
 ### Patch Changes

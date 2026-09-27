@@ -1,5 +1,13 @@
 # @adapttable/react
 
+## 1.3.4
+
+### Patch Changes
+
+- Updated dependencies [7ee30f8]
+- Updated dependencies [343239c]
+  - @adapttable/core@3.4.0
+
 ## 1.3.3
 
 ### Patch Changes

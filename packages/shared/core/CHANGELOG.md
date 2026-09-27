@@ -1,5 +1,12 @@
 # @adapttable/core
 
+## 3.4.0
+
+### Minor Changes
+
+- 7ee30f8: The conformance suite covers what a reader hears and does, not only the markup: the status region's announcements after a sort or a page, the dataset size on a partial page, the host's labels in controls and announcements, and keyboard cell navigation — the grid role, the roving tab stop, arrow keys and the focus announcer. A scenario takes `pageSize`, `navigable` and `labels` (`ConformanceLabels`), and the harness's `fireEvent` carries `keyDown`.
+- 343239c: New entry: `@adapttable/core/conformance` — the conformance suite every built-in adapter passes. It exports `tableConformanceTests`, the driver and harness types it runs with, and the scenario data, so an adapter or binding built outside the repository runs the same assertions. The entry imports no test runner and no framework.
+
 ## 3.3.0
 
 ### Minor Changes

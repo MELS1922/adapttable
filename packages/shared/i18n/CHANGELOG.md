@@ -1,5 +1,13 @@
 # @adapttable/i18n
 
+## 3.2.5
+
+### Patch Changes
+
+- Updated dependencies [7ee30f8]
+- Updated dependencies [343239c]
+  - @adapttable/core@3.4.0
+
 ## 3.2.4
 
 ### Patch Changes
