@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { useDataTable } from "../src/useDataTable";
+import { useDataTable } from "./useDataTable";
 
 describe("useDataTable", () => {
   it("should return a reactive-style object with rows and filters", () => {
