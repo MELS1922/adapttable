@@ -10,17 +10,11 @@ export default defineConfig({
     alias: [
       {
         find: /^@adapttable\/core$/,
-        replacement: path.resolve(
-          packageDir,
-          "../../shared/core/src/index.ts",
-        ),
+        replacement: path.resolve(packageDir, "../../shared/core/src/index.ts"),
       },
       {
         find: /^@adapttable\/core\/(.+)$/,
-        replacement: path.resolve(
-          packageDir,
-          "../../shared/core/src/$1.ts",
-        ),
+        replacement: path.resolve(packageDir, "../../shared/core/src/$1.ts"),
       },
     ],
   },
