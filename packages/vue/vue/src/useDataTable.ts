@@ -1,11 +1,13 @@
+import { type ColumnInput } from '@adapttable/core';
+
 interface DataTableProps {
-  columns?: any[];
-  data?: any[];
+  columns?: ColumnInput<Record<string, unknown>>[];
+  data?: Record<string, unknown>[];
 }
 
 export function useDataTable(props: DataTableProps) {
-  const rows = props.data || [];
-  const filters: any[] = [];
+  const rows = props.data ?? [];
+  const filters: unknown[] = [];
 
   return {
     rows,
