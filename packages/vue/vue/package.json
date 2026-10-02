@@ -15,7 +15,7 @@
     "lint": "eslint src"
   },
   "peerDependencies": {
-    "@adapttable/core": "^0.0.0",
+    "@adapttable/core": "workspace:*",
     "vue": "^3.4.0"
   },
   "devDependencies": {

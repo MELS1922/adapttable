@@ -1,4 +1,4 @@
-import { type ColumnInput } from '@adapttable/core';
+import { type ColumnInput } from "@adapttable/core";
 
 interface DataTableProps {
   columns?: ColumnInput<Record<string, unknown>>[];
